@@ -33,12 +33,13 @@ interface JurisprudenciaFormData {
 }
 
 interface JurisprudenciaItem {
+  idDocumento: string;
   titulo: string;
   ministro: string;
   orgao_julgador: string;
   ementa: string;
   julgamento_data: string;
-  publicacao_data: string;
+  publicacao_data?: string;
   inteiro_teor_url: string;
 }
 
@@ -674,15 +675,14 @@ export default function Jurisprudencia() {
 
               {jurisprudenciaData.data && jurisprudenciaData.data.length > 0 ? (
                 <div className="grid gap-6">
-                  {jurisprudenciaData.data.map((item, index) => (
+                  {jurisprudenciaData.data.map((item) => (
                     <Card
-                      key={index}
+                      key={item.idDocumento}
                       className="bg-white/95 backdrop-blur-sm shadow-xl border-0 rounded-3xl transform transition-all duration-500 hover:shadow-2xl hover:scale-[1.02] animate-fade-in overflow-hidden"
-                      style={{ animationDelay: `${index * 0.1}s` }}
                     >
                       <CardContent className="p-8">
                         <div className="space-y-6">
-                          {/* Título */}
+                          {/* Título do documento */}
                           <div className="flex items-start space-x-3">
                             <span className="text-2xl mt-1">📌</span>
                             <div className="flex-1">
@@ -692,35 +692,35 @@ export default function Jurisprudencia() {
                             </div>
                           </div>
 
-                          {/* Informações com ícones */}
-                          <div className="grid md:grid-cols-2 gap-4">
-                            <div className="flex items-center space-x-3 bg-blue-50 p-4 rounded-2xl">
-                              <span className="text-2xl">🧑‍⚖️</span>
-                              <div>
-                                <p className="text-sm font-semibold text-gray-600">
-                                  Ministro
-                                </p>
-                                <p className="font-bold text-gray-800">
-                                  {item.ministro}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-3 bg-purple-50 p-4 rounded-2xl">
-                              <span className="text-2xl">🏛️</span>
-                              <div>
-                                <p className="text-sm font-semibold text-gray-600">
-                                  Órgão Julgador
-                                </p>
-                                <p className="font-bold text-gray-800">
-                                  {item.orgao_julgador}
-                                </p>
-                              </div>
+                          {/* Ministro */}
+                          <div className="flex items-center space-x-3 bg-blue-50 p-4 rounded-2xl">
+                            <span className="text-2xl">👩‍⚖️</span>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-600">
+                                Ministro
+                              </p>
+                              <p className="font-bold text-gray-800">
+                                {item.ministro || "Não informado"}
+                              </p>
                             </div>
                           </div>
 
-                          {/* Data de Julgamento */}
+                          {/* Órgão Julgador */}
+                          <div className="flex items-center space-x-3 bg-purple-50 p-4 rounded-2xl">
+                            <span className="text-2xl">🏛️</span>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-600">
+                                Órgão Julgador
+                              </p>
+                              <p className="font-bold text-gray-800">
+                                {item.orgao_julgador || "Não informado"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Data do julgamento */}
                           <div className="flex items-center space-x-3 bg-green-50 p-4 rounded-2xl">
-                            <span className="text-2xl">🗓️</span>
+                            <span className="text-2xl">📅</span>
                             <div>
                               <p className="text-sm font-semibold text-gray-600">
                                 Julgamento
@@ -731,15 +731,15 @@ export default function Jurisprudencia() {
                             </div>
                           </div>
 
-                          {/* Ementa */}
+                          {/* Ementa completa */}
                           <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
                             <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
                               <span className="text-xl">📢</span>
                               <span>Ementa</span>
                             </h4>
-                            <div className="max-h-48 overflow-y-auto">
-                              <p className="text-gray-700 leading-relaxed">
-                                {item.ementa}
+                            <div className="text-gray-700 leading-relaxed">
+                              <p className="whitespace-pre-wrap">
+                                {item.ementa || "Ementa indisponível"}
                               </p>
                             </div>
                           </div>
