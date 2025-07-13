@@ -32,8 +32,22 @@ interface JurisprudenciaFormData {
   pageSize: number;
 }
 
+interface JurisprudenciaItem {
+  titulo: string;
+  ministro: string;
+  orgao_julgador: string;
+  ementa: string;
+  julgamento_data: string;
+  publicacao_data: string;
+  inteiro_teor_url: string;
+}
+
 interface WebhookResponse {
-  resumoIA: string;
+  total: number;
+  page: number;
+  pageSize: number;
+  data: JurisprudenciaItem[];
+  resumoIA?: string;
 }
 
 interface SecaoAnalise {
@@ -66,6 +80,8 @@ export default function Jurisprudencia() {
   const [isLoading, setIsLoading] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [secoesAnalise, setSecoesAnalise] = useState<SecaoAnalise[]>([]);
+  const [jurisprudenciaData, setJurisprudenciaData] =
+    useState<WebhookResponse | null>(null);
   const { toast } = useToast();
 
   const parseAnaliseIA = (texto: string): SecaoAnalise[] => {
@@ -230,6 +246,7 @@ export default function Jurisprudencia() {
 
       const response = await fetch(webhookUrl, {
         method: "POST",
+        mode: "cors",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -270,20 +287,56 @@ export default function Jurisprudencia() {
       }
 
       // Processar a resposta
-      let textoAnalise = "";
+      let processedData: WebhookResponse;
+
+      // Verificar se os dados estão dentro de resumoIA como JSON string
       if (data && data.resumoIA) {
-        textoAnalise = data.resumoIA;
-      } else if (typeof data === "string") {
-        textoAnalise = data;
+        try {
+          // Verificar se resumoIA começa com "={" (indicando JSON)
+          let jsonString = data.resumoIA;
+          if (jsonString.startsWith("={")) {
+            jsonString = jsonString.substring(1); // Remove o "=" inicial
+          }
+
+          // Tentar parsear resumoIA como JSON
+          const parsedResumoIA = JSON.parse(jsonString);
+
+          // Se for um objeto com as propriedades esperadas, usar como dados principais
+          if (
+            parsedResumoIA &&
+            typeof parsedResumoIA === "object" &&
+            parsedResumoIA.data
+          ) {
+            processedData = {
+              total: parsedResumoIA.total || 0,
+              page: parsedResumoIA.page || 1,
+              pageSize: parsedResumoIA.pageSize || 10,
+              data: parsedResumoIA.data || [],
+              resumoIA: undefined, // Não mostrar como texto já que temos dados estruturados
+            };
+          } else {
+            // Se não for dados estruturados, tratar como análise textual
+            processedData = data;
+            const textoAnalise = data.resumoIA;
+            setResultado(textoAnalise);
+            const secoesParsed = parseAnaliseIA(textoAnalise);
+            setSecoesAnalise(secoesParsed);
+          }
+        } catch (parseError) {
+          // Se não conseguir parsear, tratar como análise textual
+          console.log("Tratando resumoIA como texto:", parseError);
+          processedData = data;
+          const textoAnalise = data.resumoIA;
+          setResultado(textoAnalise);
+          const secoesParsed = parseAnaliseIA(textoAnalise);
+          setSecoesAnalise(secoesParsed);
+        }
       } else {
-        textoAnalise = JSON.stringify(data, null, 2);
+        // Usar dados como estão
+        processedData = data;
       }
 
-      setResultado(textoAnalise);
-
-      // Parse do texto da IA em seções
-      const secoesParsed = parseAnaliseIA(textoAnalise);
-      setSecoesAnalise(secoesParsed);
+      setJurisprudenciaData(processedData);
 
       toast({
         title: "Sucesso!",
@@ -321,6 +374,20 @@ export default function Jurisprudencia() {
     setPalavraChaveInput("");
     setResultado(null);
     setSecoesAnalise([]);
+    setJurisprudenciaData(null);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   return (
@@ -570,6 +637,166 @@ export default function Jurisprudencia() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {jurisprudenciaData && (
+            <div className="mt-12 space-y-8">
+              <div className="text-center mb-12">
+                <div className="flex items-center justify-center mb-6">
+                  <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg">
+                    <Scale className="h-12 w-12 text-white" />
+                  </div>
+                </div>
+                <h2 className="text-4xl font-bold bg-gradient-to-r from-green-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-4">
+                  Análise Completa de Jurisprudência
+                </h2>
+                <p className="text-gray-600 text-xl max-w-2xl mx-auto">
+                  Resultados encontrados com base na sua consulta
+                </p>
+                <div className="flex items-center justify-center space-x-4 mt-6">
+                  <Badge
+                    variant="outline"
+                    className="px-4 py-2 text-sm border-green-200 text-green-700"
+                  >
+                    📊 Total: {jurisprudenciaData.total} itens
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="px-4 py-2 text-sm border-blue-200 text-blue-700"
+                  >
+                    📄 Página: {jurisprudenciaData.page} de{" "}
+                    {Math.ceil(
+                      jurisprudenciaData.total / jurisprudenciaData.pageSize,
+                    )}
+                  </Badge>
+                </div>
+              </div>
+
+              {jurisprudenciaData.data && jurisprudenciaData.data.length > 0 ? (
+                <div className="grid gap-6">
+                  {jurisprudenciaData.data.map((item, index) => (
+                    <Card
+                      key={index}
+                      className="bg-white/95 backdrop-blur-sm shadow-xl border-0 rounded-3xl transform transition-all duration-500 hover:shadow-2xl hover:scale-[1.02] animate-fade-in overflow-hidden"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <CardContent className="p-8">
+                        <div className="space-y-6">
+                          {/* Título */}
+                          <div className="flex items-start space-x-3">
+                            <span className="text-2xl mt-1">📌</span>
+                            <div className="flex-1">
+                              <h3 className="text-2xl font-bold text-gray-800 leading-tight">
+                                {item.titulo}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {/* Informações com ícones */}
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div className="flex items-center space-x-3 bg-blue-50 p-4 rounded-2xl">
+                              <span className="text-2xl">🧑‍⚖️</span>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-600">
+                                  Ministro
+                                </p>
+                                <p className="font-bold text-gray-800">
+                                  {item.ministro}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-3 bg-purple-50 p-4 rounded-2xl">
+                              <span className="text-2xl">🏛️</span>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-600">
+                                  Órgão Julgador
+                                </p>
+                                <p className="font-bold text-gray-800">
+                                  {item.orgao_julgador}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Data de Julgamento */}
+                          <div className="flex items-center space-x-3 bg-green-50 p-4 rounded-2xl">
+                            <span className="text-2xl">🗓️</span>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-600">
+                                Julgamento
+                              </p>
+                              <p className="font-bold text-gray-800">
+                                {item.julgamento_data}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Ementa */}
+                          <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                            <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                              <span className="text-xl">📢</span>
+                              <span>Ementa</span>
+                            </h4>
+                            <div className="max-h-48 overflow-y-auto">
+                              <p className="text-gray-700 leading-relaxed">
+                                {item.ementa}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Botão Ver Inteiro Teor */}
+                          <div className="flex justify-center pt-4">
+                            <a
+                              href={item.inteiro_teor_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                            >
+                              <span className="text-lg">🔗</span>
+                              <span>Ver Inteiro Teor</span>
+                            </a>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-white/95 backdrop-blur-sm shadow-xl border-0 rounded-3xl overflow-hidden">
+                  <CardContent className="p-12 text-center">
+                    <div className="space-y-6">
+                      <div className="text-6xl mb-4">❌</div>
+                      <h3 className="text-2xl font-bold text-gray-800">
+                        Nenhuma jurisprudência encontrada com os critérios
+                        informados
+                      </h3>
+                      <p className="text-gray-600 text-lg">
+                        Tente ajustar os termos da consulta ou as palavras-chave
+                        para obter resultados.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="text-center mt-12">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-3xl border border-blue-100">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                    Consulta Concluída com Sucesso! 🎉
+                  </h3>
+                  <p className="text-gray-600 mb-6 text-lg">
+                    Sua pesquisa jurisprudencial foi processada com sucesso
+                  </p>
+                  <Button
+                    onClick={handleNovaConsulta}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-10 py-4 rounded-2xl text-lg font-bold transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl flex items-center space-x-3 mx-auto"
+                  >
+                    <RefreshCw className="h-6 w-6" />
+                    <span>Fazer Nova Consulta</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
 
           {secoesAnalise.length > 0 && (
